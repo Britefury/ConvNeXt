@@ -62,18 +62,27 @@ class ConvNeXt(nn.Module):
         drop_path_rate (float): Stochastic depth rate. Default: 0.
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
         head_init_scale (float): Init scaling value for classifier weights and biases. Default: 1.
+        patchify (bool): if False, use the 7x7 Conv - maxpool used in the original ResNet architecture
     """
     def __init__(self, in_chans=3, num_classes=1000, 
                  depths=[3, 3, 9, 3], dims=[96, 192, 384, 768], drop_path_rate=0., 
-                 layer_scale_init_value=1e-6, head_init_scale=1.,
+                 layer_scale_init_value=1e-6, head_init_scale=1., patchify=True
                  ):
         super().__init__()
 
         self.downsample_layers = nn.ModuleList() # stem and 3 intermediate downsampling conv layers
-        stem = nn.Sequential(
-            nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4),
-            LayerNorm(dims[0], eps=1e-6, data_format="channels_first")
-        )
+        if patchify:
+            stem = nn.Sequential(
+                nn.Conv2d(in_chans, dims[0], kernel_size=4, stride=4),
+                LayerNorm(dims[0], eps=1e-6, data_format="channels_first")
+            )
+        else:
+            stem = nn.Sequential(
+                nn.Conv2d(in_chans, dims[0], kernel_size=7, stride=2, padding=3),
+                LayerNorm(dims[0], eps=1e-6, data_format="channels_first"),
+                nn.GELU(),
+                nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+            )
         self.downsample_layers.append(stem)
         for i in range(3):
             downsample_layer = nn.Sequential(
